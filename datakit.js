@@ -1,37 +1,77 @@
 var express = require("express"),
-    mongoose = require("mongoose"),
     assert = require("assert"),
-    app = express.createServer();
+    Mongolian = require("mongolian"),
+    app = express.createServer(),
+    conf = {},
+    dbServer = null,
+    db = null;
 
-// install middleware
+// Install middleware
 app.use(express.bodyParser());
 
-exports.run = function(config) {
-  var db = dkSafeValue(config.db, null);
-  var endpoint = dkSafeValue(config.endpoint, "");
-  var port = dkSafeValue(config.port, process.env.PORT || 3000);
-  assert(db !== null);
+// Exported functions
+exports.run = function(c) {
+  conf.db = dkSafeValue(c.db, "datakit");
+  conf.path = dkSafeValue(c.path, "");
+  conf.port = dkSafeValue(c.port, process.env.PORT || 3000);
   
-  // connect mongoose
-  mongoose.connect(config.db);
+  assert.notEqual(conf.db, null, "database connection string cannot be empty");
   
-  // create API routes
-  dkCreateRoutes(endpoint);
+  // Create API routes
+  dkCreateRoutes(conf.path);
   
-  // run app
-  app.listen(port, function() {
-    console.log("datakit started on port", port);
+  // Connect to DB
+  dbServer = new Mongolian;
+  db = dbServer.db(conf.db);
+  
+  // Run app
+  app.listen(conf.port, function() {
+    console.log("datakit started on port", conf.port);
   });
 }
 
-var dkCreateObject = function(req, res) {
-  console.log("createObject");
+// Internal functions
+var dkSaveObject = function(req, res) {
+  var entity = req.param("entity", null);
+  var obj = req.param("obj", null);
+  
+  if (entity == null) {
+    return res.json(dkError("Entity name not set", 100), 400);
+  }
+  if (obj == null) {
+    return res.json(dkError("Object data not set", 101), 400);
+  }
+  
+  // Get collection
+  var col = db.collection(entity).insert(obj, function(err, result) {
+    if (err != null) {
+      console.log("error:", e);
+      res.json(dkError("Could not save object", 102), 400);
+    }
+    else {
+      console.log("result =>", result);
+      res.json(dkSanitizeDocId(result), 200);
+    }
+  });
+}
+
+var dkSanitizeDocId = function(obj) {
+  if (obj != null && typeof obj._id !== "undefined") {
+    if (typeof obj._id.bytes !== "undefined") {
+      obj._id = obj._id.bytes.toString("hex");
+    }
+  }
+  return obj;
+}
+
+var dkError = function(message, status) {
+  return {"status": status, "message": message};
 }
 
 var dkSafeValue = function(value, def) {
   return (typeof value !== "undefined") ? value : def;
 }
 
-var dkCreateRoutes = function(endpoint) {
-  app.post(endpoint + "/create", dkCreateObject);
+var dkCreateRoutes = function(path) {
+  app.post(path + "/save", dkSaveObject);
 }
