@@ -1,0 +1,11 @@
+{
+  "name": "datakit",
+  "version": "1.0.0",
+  "dependencies": {
+    "express": "2.5.6",
+    "mongoose": "2.5"
+  },
+  "scripts": {
+    "supervisor": "supervisor -n error -w bin,lib,. run.js"
+  }
+}
