@@ -1,77 +1,89 @@
 var express = require("express"),
     assert = require("assert"),
-    Mongolian = require("mongolian"),
-    app = express.createServer(),
-    conf = {},
-    dbServer = null,
-    db = null;
+    mongo = require("mongodb"),
+    doSync = require("sync"),
+    app = express.createServer();
 
-// Install middleware
+// Middleware
 app.use(express.bodyParser());
+
+// Private functions
+var _conf = {};
+var _db = {};
+var _createRoutes = function(path) {
+  app.post(path + "/save", exports.saveObject);
+}
+var _e = function(m, s) {
+  return {"status": s, "message": m};
+}
+var _exists = function(v) {
+  return (typeof v !== "undefined" && v != null);
+}
+var _safe = function(v, d) {
+  return (typeof v !== "undefined") ? v : d;
+}
 
 // Exported functions
 exports.run = function(c) {
-  conf.db = dkSafeValue(c.db, "datakit");
-  conf.path = dkSafeValue(c.path, "");
-  conf.port = dkSafeValue(c.port, process.env.PORT || 3000);
-  
-  assert.notEqual(conf.db, null, "database connection string cannot be empty");
-  
-  // Create API routes
-  dkCreateRoutes(conf.path);
-  
-  // Connect to DB
-  dbServer = new Mongolian;
-  db = dbServer.db(conf.db);
-  
-  // Run app
-  app.listen(conf.port, function() {
-    console.log("datakit started on port", conf.port);
-  });
-}
+  doSync(function() {
+    _conf.db = _safe(c.db, "datakit");
+    _conf.path = _safe(c.path, "");
+    _conf.port = _safe(c.port, process.env.PORT || 3000);
 
-// Internal functions
-var dkSaveObject = function(req, res) {
-  var entity = req.param("entity", null);
-  var obj = req.param("obj", null);
-  
-  if (entity == null) {
-    return res.json(dkError("Entity name not set", 100), 400);
-  }
-  if (obj == null) {
-    return res.json(dkError("Object data not set", 101), 400);
-  }
-  
-  // Get collection
-  var col = db.collection(entity).insert(obj, function(err, result) {
-    if (err != null) {
-      console.log("error:", e);
-      res.json(dkError("Could not save object", 102), 400);
+    console.log("conf =>", _conf);
+
+    assert.notEqual(_conf.db, null, "database connection string cannot be empty");
+
+    // Create API routes
+    _createRoutes(_conf.path);
+
+    // Connect to DB and run
+    var srv = new mongo.Server("localhost", mongo.Connection.DEFAULT_PORT, {});
+    var db = new mongo.Db(_conf.db, srv);
+    try {
+      _db = db.open.sync(db);
+      app.listen(_conf.port, function() {
+        console.log("datakit started on port", _conf.port);
+      });
     }
-    else {
-      console.log("result =>", result);
-      res.json(dkSanitizeDocId(result), 200);
+    catch (e) {
+      console.error(e);
     }
   });
 }
-
-var dkSanitizeDocId = function(obj) {
-  if (obj != null && typeof obj._id !== "undefined") {
-    if (typeof obj._id.bytes !== "undefined") {
-      obj._id = obj._id.bytes.toString("hex");
+exports.saveObject = function(req, res) {
+  doSync(function() {
+    var entity = req.param("entity", null);
+    var obj = req.param("obj", null);
+    if (!_exists(entity)) {
+      return res.json(_e("Entity name not set", 100), 400);
     }
-  }
-  return obj;
-}
-
-var dkError = function(message, status) {
-  return {"status": status, "message": message};
-}
-
-var dkSafeValue = function(value, def) {
-  return (typeof value !== "undefined") ? value : def;
-}
-
-var dkCreateRoutes = function(path) {
-  app.post(path + "/save", dkSaveObject);
+    if (!_exists(obj)) {
+      return res.json(_e("Object data not set", 101), 400);
+    }
+    var oid = null;
+    if (_exists(obj._id)) {
+      oid = new mongo.ObjectID(obj._id);
+      delete obj["_id"];
+    }
+    try {
+      var collection = _db.collection.sync(_db, entity);
+      var doc;
+      if (oid !== null) {
+        var opts = {"upsert": true, "new": true};
+        doc = collection.findAndModify.sync(collection, {"_id": oid}, [], {"$set": obj}, opts);
+      }
+      else {
+        doc = collection.insert.sync(collection, obj);
+      }
+      if (doc.length > 0) {
+        doc = doc[0];
+      }
+      res.json(doc, 200);
+    }
+    catch (e) {
+      console.error(e);
+      res.json(_e("Could not save object", 102), 400);
+    }
+  })
 }
