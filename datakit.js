@@ -16,11 +16,14 @@ var _createRoutes = function(path) {
 var _e = function(m, s) {
   return {"status": s, "message": m};
 }
+var _def = function(v) {
+  return (typeof v !== "undefined");
+}
 var _exists = function(v) {
-  return (typeof v !== "undefined" && v != null);
+  return _def(v) && v != null;
 }
 var _safe = function(v, d) {
-  return (typeof v !== "undefined") ? v : d;
+  return _def(v) ? v : d;
 }
 
 // Exported functions
@@ -31,8 +34,6 @@ exports.run = function(c) {
     _conf.port = _safe(c.port, process.env.PORT || 3000);
 
     console.log("conf =>", _conf);
-
-    assert.notEqual(_conf.db, null, "database connection string cannot be empty");
 
     // Create API routes
     _createRoutes(_conf.path);
