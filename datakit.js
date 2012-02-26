@@ -148,7 +148,6 @@ exports.refreshObject = function(req, res) {
     try {
       var collection = _db.collection.sync(_db, entity);
       var result = collection.findOne.sync(collection, {"_id": oid});
-      console.log("refresh result =>", result);
       if (!_exists(result)) {
         throw "Could not find object";
       }
