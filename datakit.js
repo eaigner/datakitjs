@@ -13,6 +13,7 @@ var _db = {};
 var _createRoutes = function(path) {
   app.post(path + "/save", exports.saveObject);
   app.post(path + "/delete", exports.deleteObject);
+  app.post(path + "/refresh", exports.refreshObject);
 }
 var _e = function(res, snm, err) {
   var eo = {"status": snm[0], "message": snm[1]};
@@ -27,7 +28,8 @@ var _ERR = {
   OBJECT_ID_NOT_SET: [102, "Object ID not set"],
   OBJECT_ID_INVALID: [103, "Object ID invalid"],
   SAVE_FAILED: [200, "Save failed"],
-  DELETE_FAILED: [300, "Delete failed"]
+  DELETE_FAILED: [300, "Delete failed"],
+  REFRESH_FAILED: [400, "Refresh failed"]
 }
 var _def = function(v) {
   return (typeof v !== "undefined");
@@ -121,12 +123,40 @@ exports.deleteObject = function(req, res) {
     try {
       var collection = _db.collection.sync(_db, entity);
       var result = collection.remove.sync(collection, {"_id": oid}, {"safe": true});
-      console.log("remove result =>", result);
       res.send('', 200);
     }
     catch (e) {
       console.error(e);
       return _e(res, _ERR.DELETE_FAILED, e);
+    }
+  })
+}
+exports.refreshObject = function(req, res) {
+  doSync(function() {
+    var entity = req.param("entity", null);
+    var oidStr = req.param("oid", null);
+    if (!_exists(entity)) {
+      return _e(res, _ERR.ENTITY_NOT_SET);
+    }
+    if (!_exists(oidStr)) {
+      return _e(res, _ERR.OBJECT_ID_NOT_SET);
+    }
+    var oid = new mongo.ObjectID(oidStr);
+    if (!_exists(oid)) {
+      return _e(res, _ERR.OBJECT_ID_INVALID);
+    }
+    try {
+      var collection = _db.collection.sync(_db, entity);
+      var result = collection.findOne.sync(collection, {"_id": oid});
+      console.log("refresh result =>", result);
+      if (!_exists(result)) {
+        throw "Could not find object";
+      }
+      res.send(result, 200);
+    }
+    catch (e) {
+      console.error(e);
+      return _e(res, _ERR.REFRESH_FAILED, e);
     }
   })
 }
