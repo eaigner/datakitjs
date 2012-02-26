@@ -24,9 +24,8 @@ var _e = function(res, snm, err) {
 }
 var _ERR = {
   ENTITY_NOT_SET: [100, "Entity not set"],
-  OBJECT_NOT_SET: [101, "Object not set"],
-  OBJECT_ID_NOT_SET: [102, "Object ID not set"],
-  OBJECT_ID_INVALID: [103, "Object ID invalid"],
+  OBJECT_ID_NOT_SET: [101, "Object ID not set"],
+  OBJECT_ID_INVALID: [102, "Object ID invalid"],
   SAVE_FAILED: [200, "Save failed"],
   DELETE_FAILED: [300, "Delete failed"],
   REFRESH_FAILED: [400, "Refresh failed"]
@@ -70,17 +69,15 @@ exports.run = function(c) {
 exports.saveObject = function(req, res) {
   doSync(function() {
     var entity = req.param("entity", null);
-    var obj = req.param("obj", null);
     if (!_exists(entity)) {
       return _e(res, _ERR.ENTITY_NOT_SET);
     }
-    if (!_exists(obj)) {
-      return _e(res, _ERR.OBJECT_NOT_SET);
-    }
+    var oidStr = req.param("oid", null);
+    var fset = req.param("set", null);
+    var funset = req.param("unset", null);
     var oid = null;
-    if (_exists(obj._id)) {
-      oid = new mongo.ObjectID(obj._id);
-      delete obj["_id"];
+    if (_exists(oidStr)) {
+      oid = new mongo.ObjectID(oidStr);
       if (!_exists(oid)) {
         return _e(res, _ERR.OBJECT_ID_INVALID);
       }
@@ -90,10 +87,13 @@ exports.saveObject = function(req, res) {
       var doc;
       if (oid !== null) {
         var opts = {"upsert": true, "new": true};
-        doc = collection.findAndModify.sync(collection, {"_id": oid}, [], {"$set": obj}, opts);
+        var update = {};
+        if (_exists(fset)) update["$set"] = fset;
+        if (_exists(funset)) update["$unset"] = funset;
+        doc = collection.findAndModify.sync(collection, {"_id": oid}, [], update, opts);
       }
       else {
-        doc = collection.insert.sync(collection, obj);
+        doc = collection.insert.sync(collection, fset);
       }
       if (doc.length > 0) {
         doc = doc[0];
