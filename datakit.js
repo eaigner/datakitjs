@@ -12,9 +12,22 @@ var _conf = {};
 var _db = {};
 var _createRoutes = function(path) {
   app.post(path + "/save", exports.saveObject);
+  app.post(path + "/delete", exports.deleteObject);
 }
-var _e = function(m, s) {
-  return {"status": s, "message": m};
+var _e = function(res, snm, err) {
+  var eo = {"status": snm[0], "message": snm[1]};
+  if (_exists(err)) {
+    eo.err = String(err);
+  }
+  return res.json(eo, 400);
+}
+var _ERR = {
+  ENTITY_NOT_SET: [100, "Entity not set"],
+  OBJECT_NOT_SET: [101, "Object not set"],
+  OBJECT_ID_NOT_SET: [102, "Object ID not set"],
+  OBJECT_ID_INVALID: [103, "Object ID invalid"],
+  SAVE_FAILED: [200, "Save failed"],
+  DELETE_FAILED: [300, "Delete failed"]
 }
 var _def = function(v) {
   return (typeof v !== "undefined");
@@ -57,15 +70,18 @@ exports.saveObject = function(req, res) {
     var entity = req.param("entity", null);
     var obj = req.param("obj", null);
     if (!_exists(entity)) {
-      return res.json(_e("Entity name not set", 100), 400);
+      return _e(res, _ERR.ENTITY_NOT_SET);
     }
     if (!_exists(obj)) {
-      return res.json(_e("Object data not set", 101), 400);
+      return _e(res, _ERR.OBJECT_NOT_SET);
     }
     var oid = null;
     if (_exists(obj._id)) {
       oid = new mongo.ObjectID(obj._id);
       delete obj["_id"];
+      if (!_exists(oid)) {
+        return _e(res, _ERR.OBJECT_ID_INVALID);
+      }
     }
     try {
       var collection = _db.collection.sync(_db, entity);
@@ -84,7 +100,33 @@ exports.saveObject = function(req, res) {
     }
     catch (e) {
       console.error(e);
-      res.json(_e("Could not save object", 102), 400);
+      return _e(res, _ERR.SAVE_FAILED, e);
+    }
+  })
+}
+exports.deleteObject = function(req, res) {
+  doSync(function() {
+    var entity = req.param("entity", null);
+    var oidStr = req.param("oid", null);
+    if (!_exists(entity)) {
+      return _e(res, _ERR.ENTITY_NOT_SET);
+    }
+    if (!_exists(oidStr)) {
+      return _e(res, _ERR.OBJECT_ID_NOT_SET);
+    }
+    var oid = new mongo.ObjectID(oidStr);
+    if (!_exists(oid)) {
+      return _e(res, _ERR.OBJECT_ID_INVALID);
+    }
+    try {
+      var collection = _db.collection.sync(_db, entity);
+      var result = collection.remove.sync(collection, {"_id": oid}, {"safe": true});
+      console.log("remove result =>", result);
+      res.send('', 200);
+    }
+    catch (e) {
+      console.error(e);
+      return _e(res, _ERR.DELETE_FAILED, e);
     }
   })
 }
