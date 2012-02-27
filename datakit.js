@@ -1,6 +1,7 @@
 var express = require("express"),
     assert = require("assert"),
     mongo = require("mongodb"),
+    crypto = require("crypto"),
     doSync = require("sync"),
     app = express.createServer();
 
@@ -43,11 +44,23 @@ var _safe = function(v, d) {
 // Exported functions
 exports.run = function(c) {
   doSync(function() {
+    var pad = "----------------------------------------";
+    var nl = "\n";
+    console.log(nl + pad + nl + "DATAKIT" + nl + pad);
     _conf.db = _safe(c.db, "datakit");
     _conf.path = _safe(c.path, "");
     _conf.port = _safe(c.port, process.env.PORT || 3000);
+    _conf.secret = _safe(c.secret, null);
+    if (_conf.secret == null) {
+      var buf = crypto.randomBytes.sync(crypto, 32);
+      _conf.secret = buf.toString("hex");
+      console.log("INFO: no secret found in config, generated new one");
+    }
+    if (_conf.secret.length !== 64) {
+      throw "Secret is not a hex string of length 64 (256 bytes)"
+    }
 
-    console.log("conf =>", _conf);
+    console.log("CONF: =>", _conf);
 
     // Create API routes
     _createRoutes(_conf.path);

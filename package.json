@@ -7,6 +7,6 @@
     "sync": "v0.2.0"
   },
   "scripts": {
-    "supervisor": "supervisor -n error -w bin,lib,. run.js"
+    "sv": "supervisor -n error -w bin,lib,. run.js"
   }
 }
