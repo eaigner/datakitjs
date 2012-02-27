@@ -68,7 +68,6 @@ exports.run = function(c) {
         "key": fs.readFileSync(_conf.key),
         "cert": fs.readFileSync(_conf.cert)
       });
-      console.log("SSL Secured")
     }
     else {
       app = express.createServer()
