@@ -23,6 +23,14 @@ var _e = function(res, snm, err) {
   }
   return res.json(eo, 400);
 }
+var _c = {
+  red: "\u001b[31m",
+  green: "\u001b[32m",
+  yellow: "\u001b[33m",
+  blue: "\u001b[34m",
+  purple: "\u001b[34m",
+  reset: "\u001b[0m"
+}
 var _ERR = {
   ENTITY_NOT_SET: [100, "Entity not set"],
   OBJECT_ID_NOT_SET: [101, "Object ID not set"],
@@ -44,7 +52,7 @@ var _safe = function(v, d) {
 // Exported functions
 exports.run = function(c) {
   doSync(function() {
-    var pad = "----------------------------------------";
+    var pad = "--------------------------------------------------------------------------------";
     var nl = "\n";
     console.log(nl + pad + nl + "DATAKIT" + nl + pad);
     _conf.db = _safe(c.db, "datakit");
@@ -56,13 +64,21 @@ exports.run = function(c) {
     if (_conf.secret == null) {
       var buf = crypto.randomBytes.sync(crypto, 32);
       _conf.secret = buf.toString("hex");
-      console.log("INFO: no secret found in config, generated new one");
+      console.log(_c.red + "WARN:\tNo secret found in config, generated new one.\n",
+                  "\tCopy this secret to your DataKit iOS app and server config!\n\n",
+                  _c.yellow,
+                  "\t" + _conf.secret, nl, nl,
+                  _c.red,
+                  "\tTerminating process.",
+                  _c.reset);
+      process.exit(code=1);
     }
     if (_conf.secret.length !== 64) {
-      throw "Secret is not a hex string of length 64 (256 bytes)"
+      console.log(_c.red, "\nSecret is not a hex string of length 64 (256 bytes), terminating process.\n", _c.reset);
+      process.exit(code=2);
     }
 
-    console.log("CONF: =>", _conf);
+    console.log("CONFIG:", JSON.stringify(_conf, undefined, 2), nl);
 
     // Create API routes
     _createRoutes(_conf.path);
@@ -73,7 +89,7 @@ exports.run = function(c) {
     try {
       _db = db.open.sync(db);
       app.listen(_conf.port, function() {
-        console.log("datakit started on port", _conf.port);
+        console.log(_c.green + "DataKit started on port", _conf.port, _c.reset);
       });
     }
     catch (e) {
