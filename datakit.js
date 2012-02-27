@@ -63,15 +63,16 @@ exports.run = function(c) {
     _conf.cert = _safe(c.cert, null);
     _conf.key = _safe(c.key, null);
     
-    var srvopts = {}
     if (_exists(_conf.cert) && _exists(_conf.key)) {
-      srvopts = {
+      app = express.createServer({
         "key": fs.readFileSync(_conf.key),
         "cert": fs.readFileSync(_conf.cert)
-      };
+      });
+      console.log("SSL Secured")
     }
-    
-    app = express.createServer(srvopts);
+    else {
+      app = express.createServer()
+    }
     app.use(express.bodyParser());
     
     if (_conf.secret == null) {
