@@ -2,16 +2,15 @@ var express = require("express"),
     assert = require("assert"),
     mongo = require("mongodb"),
     crypto = require("crypto"),
+    fs = require("fs"),
     doSync = require("sync"),
-    app = express.createServer();
-
-// Middleware
-app.use(express.bodyParser());
+    app = {};
 
 // Private functions
 var _conf = {};
 var _db = {};
 var _createRoutes = function(path) {
+  app.get(path + "/", exports.info);
   app.post(path + "/save", exports.saveObject);
   app.post(path + "/delete", exports.deleteObject);
   app.post(path + "/refresh", exports.refreshObject);
@@ -43,7 +42,7 @@ var _def = function(v) {
   return (typeof v !== "undefined");
 }
 var _exists = function(v) {
-  return _def(v) && v != null;
+  return _def(v) && v !== null;
 }
 var _safe = function(v, d) {
   return _def(v) ? v : d;
@@ -61,6 +60,20 @@ exports.run = function(c) {
     _conf.path = _safe(c.path, "");
     _conf.port = _safe(c.port, process.env.PORT || 3000);
     _conf.secret = _safe(c.secret, null);
+    _conf.cert = _safe(c.cert, null);
+    _conf.key = _safe(c.key, null);
+    
+    var srvopts = {}
+    if (_exists(_conf.cert) && _exists(_conf.key)) {
+      srvopts = {
+        "key": fs.readFileSync(_conf.key),
+        "cert": fs.readFileSync(_conf.cert)
+      };
+    }
+    
+    app = express.createServer(srvopts);
+    app.use(express.bodyParser());
+    
     if (_conf.secret == null) {
       var buf = crypto.randomBytes.sync(crypto, 32);
       _conf.secret = buf.toString("hex");
@@ -78,7 +91,7 @@ exports.run = function(c) {
       process.exit(code=2);
     }
 
-    console.log("CONFIG:", JSON.stringify(_conf, undefined, 2), nl);
+    console.log("CONF:", JSON.stringify(_conf, undefined, 2), nl);
 
     // Create API routes
     _createRoutes(_conf.path);
@@ -96,6 +109,9 @@ exports.run = function(c) {
       console.error(e);
     }
   });
+}
+exports.info = function(req, res) {
+  res.send("datakit", 200);
 }
 exports.saveObject = function(req, res) {
   doSync(function() {
