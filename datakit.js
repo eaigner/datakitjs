@@ -48,6 +48,8 @@ exports.run = function(c) {
     var nl = "\n";
     console.log(nl + pad + nl + "DATAKIT" + nl + pad);
     _conf.db = _safe(c.db, "datakit");
+    _conf.dbhost = _safe(c.dbhost, "localhost");
+    _conf.dbport = _safe(c.dbport, mongo.Connection.DEFAULT_PORT);
     _conf.path = _safe(c.path, "");
     _conf.port = _safe(c.port, process.env.PORT || 3000);
     _conf.secret = _safe(c.secret, null);
@@ -66,7 +68,7 @@ exports.run = function(c) {
     _createRoutes(_conf.path);
 
     // Connect to DB and run
-    var srv = new mongo.Server("localhost", mongo.Connection.DEFAULT_PORT, {});
+    var srv = new mongo.Server(_conf.dbhost, _conf.dbport, {});
     var db = new mongo.Db(_conf.db, srv);
     try {
       _db = db.open.sync(db);
