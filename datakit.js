@@ -217,6 +217,7 @@ exports.saveObject = function(req, res) {
     var fpush = req.param("push", null);
     var fpushAll = req.param("pushAll", null);
     var faddToSet = req.param("addToSet", null);
+    var fpop = req.param("pop", null);
     var oid = null;
     if (_exists(oidStr)) {
       oid = new mongo.ObjectID(oidStr);
@@ -242,6 +243,7 @@ exports.saveObject = function(req, res) {
           }
           update["$addToSet"] = ats;
         }
+        if (_exists(fpop)) update["$pop"] = fpop;
         doc = collection.findAndModify.sync(collection, {"_id": oid}, [], update, opts);
       }
       else {
