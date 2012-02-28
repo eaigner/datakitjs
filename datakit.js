@@ -10,10 +10,15 @@ var express = require("express"),
 var _conf = {};
 var _db = {};
 var _createRoutes = function(path) {
-  app.get(path + "/", exports.info);
-  app.post(path + "/save", exports.saveObject);
-  app.post(path + "/delete", exports.deleteObject);
-  app.post(path + "/refresh", exports.refreshObject);
+  var m = function(p) {
+    return path + "/" + _safe(p, "");
+  };
+  app.get(m(), exports.info);
+  app.get(m("public/:obj"), exports.public);
+  app.post(m("publish"), _secureMethod(exports.publishObject));
+  app.post(m("save"), _secureMethod(exports.saveObject));
+  app.post(m("delete"), _secureMethod(exports.deleteObject));
+  app.post(m("refresh"), _secureMethod(exports.refreshObject));
 }
 var _e = function(res, snm, err) {
   var eo = {"status": snm[0], "message": snm[1]};
@@ -46,6 +51,16 @@ var _exists = function(v) {
 }
 var _safe = function(v, d) {
   return _def(v) ? v : d;
+}
+var _secureMethod = function(m) {
+  return (function(req, res) {
+    var s = req.header("x-datakit-secret", null);
+    if (_exists(s) && s === _conf.secret) {
+      return m(req, res);
+    }
+    res.header("WWW-Authenticate", "datakit-secret");
+    res.send(401);
+  });
 }
 
 // Exported functions
@@ -112,6 +127,79 @@ exports.run = function(c) {
 }
 exports.info = function(req, res) {
   res.send("datakit", 200);
+}
+exports.public = function(req, res) {
+  doSync(function() {
+    var obj = req.param("obj", null);
+    if (_exists(obj)) {
+      var objBuf = new Buffer(obj, "base64");
+      var decipher = crypto.createDecipher("aes-256-cbc", _conf.secret);
+      var dec = decipher.update(objBuf, "binary", "utf8");
+      dec += decipher.final("utf8");
+      
+      if (_exists(dec) && dec.length > 0) {
+        var c = dec.split(":");
+        if (c.length > 1) {
+          var entity = c[0];
+          var oid = null;
+          try {
+            oid = new mongo.ObjectID(c[1]);
+          }
+          catch (e) {
+            // ignore invalid oid errors, check for null oid in next stepx
+          };
+          if (oid !== null && entity.length > 0) {
+            var fields = [];
+            if (c.length > 2) {
+              fields = c.splice(2, c.length-1);
+            }
+            try {
+              var collection = _db.collection.sync(_db, entity);
+              var result = collection.findOne.sync(collection, {"_id": oid}, fields);
+              delete result["_id"];
+              
+              // if only one field was requested we return the data of that field
+              // directly instead of the JSON representation
+              if (fields.length == 1) {
+                res.send(result[fields[0]], 200);
+              }
+              else {
+                res.json(result, 200);
+              }
+              return;
+            }
+            catch (e) {
+              console.error(e)
+            }
+          }
+        }
+      }
+    }
+    res.send(404);
+  })
+}
+exports.publishObject = function(req, res) {
+  doSync(function() {
+    var entity = req.param("entity", null);
+    if (!_exists(entity)) {
+      return _e(res, _ERR.ENTITY_NOT_SET);
+    }
+    var oid = req.param("oid", null);
+    if (!_exists(oid)) {
+      return _e(res, _ERR.OBJECT_ID_INVALID);
+    }
+    var fields = req.param("fields", null);
+    var str = entity + ":" + oid;
+    if (fields !== null && fields.length > 0) {
+      str += ":" + fields.join(":");
+    }
+    var cipher = crypto.createCipher("aes-256-cbc", _conf.secret);
+    var enc = cipher.update(str, "utf8", "hex");
+    enc += cipher.final("hex");
+    var base64 = new Buffer(enc, "hex").toString("base64");
+    
+    res.json(base64, 200);
+  })
 }
 exports.saveObject = function(req, res) {
   doSync(function() {
