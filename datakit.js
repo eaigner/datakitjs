@@ -132,6 +132,7 @@ exports.public = function(req, res) {
   doSync(function() {
     var obj = req.param("obj", null);
     if (_exists(obj)) {
+      obj = obj.replace("-", "+").replace("_", "/");
       var objBuf = new Buffer(obj, "base64");
       var decipher = crypto.createDecipher("aes-256-cbc", _conf.secret);
       var dec = decipher.update(objBuf, "binary", "utf8");
@@ -198,8 +199,9 @@ exports.publishObject = function(req, res) {
     var enc = cipher.update(str, "utf8", "hex");
     enc += cipher.final("hex");
     var base64 = new Buffer(enc, "hex").toString("base64");
+    var urlSafeBase64 = base64.replace("+", "-").replace("/", "_");
     
-    res.json(base64, 200);
+    res.json(urlSafeBase64, 200);
   })
 }
 exports.saveObject = function(req, res) {
