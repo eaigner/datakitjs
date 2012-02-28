@@ -214,6 +214,8 @@ exports.saveObject = function(req, res) {
     var fset = req.param("set", null);
     var funset = req.param("unset", null);
     var finc = req.param("inc", null);
+    var fpush = req.param("push", null);
+    var fpushAll = req.param("pushAll", null);
     var oid = null;
     if (_exists(oidStr)) {
       oid = new mongo.ObjectID(oidStr);
@@ -230,6 +232,8 @@ exports.saveObject = function(req, res) {
         if (_exists(fset)) update["$set"] = fset;
         if (_exists(funset)) update["$unset"] = funset;
         if (_exists(finc)) update["$inc"] = finc;
+        if (_exists(fpush)) update["$push"] = fpush;
+        if (_exists(fpushAll)) update["$pushAll"] = fpushAll;
         doc = collection.findAndModify.sync(collection, {"_id": oid}, [], update, opts);
       }
       else {
