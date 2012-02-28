@@ -132,7 +132,7 @@ exports.public = function(req, res) {
   doSync(function() {
     var obj = req.param("obj", null);
     if (_exists(obj)) {
-      obj = obj.replace("-", "+").replace("_", "/");
+      obj = obj.replace(/-/g, "+").replace(/_/g, "/");
       var objBuf = new Buffer(obj, "base64");
       var decipher = crypto.createDecipher("aes-256-cbc", _conf.secret);
       var dec = decipher.update(objBuf, "binary", "utf8");
@@ -199,7 +199,7 @@ exports.publishObject = function(req, res) {
     var enc = cipher.update(str, "utf8", "hex");
     enc += cipher.final("hex");
     var base64 = new Buffer(enc, "hex").toString("base64");
-    var urlSafeBase64 = base64.replace("+", "-").replace("/", "_");
+    var urlSafeBase64 = base64.replace(/\+/g, "-").replace(/\//g, "_");
     
     res.json(urlSafeBase64, 200);
   })
@@ -213,6 +213,7 @@ exports.saveObject = function(req, res) {
     var oidStr = req.param("oid", null);
     var fset = req.param("set", null);
     var funset = req.param("unset", null);
+    var finc = req.param("inc", null);
     var oid = null;
     if (_exists(oidStr)) {
       oid = new mongo.ObjectID(oidStr);
@@ -228,6 +229,7 @@ exports.saveObject = function(req, res) {
         var update = {};
         if (_exists(fset)) update["$set"] = fset;
         if (_exists(funset)) update["$unset"] = funset;
+        if (_exists(finc)) update["$inc"] = finc;
         doc = collection.findAndModify.sync(collection, {"_id": oid}, [], update, opts);
       }
       else {
