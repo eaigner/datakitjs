@@ -156,17 +156,18 @@ exports.public = function(req, res) {
             try {
               var collection = _db.collection.sync(_db, entity);
               var result = collection.findOne.sync(collection, {"_id": oid}, fields);
-              delete result["_id"];
-              
-              // if only one field was requested we return the data of that field
-              // directly instead of the JSON representation
-              if (fields.length == 1) {
-                res.send(result[fields[0]], 200);
+              if (_exists(result)) {
+                delete result["_id"];
+                // if only one field was requested we return the data of that field
+                // directly instead of the JSON representation
+                if (fields.length == 1) {
+                  res.send(result[fields[0]], 200);
+                }
+                else {
+                  res.json(result, 200);
+                }
+                return;
               }
-              else {
-                res.json(result, 200);
-              }
-              return;
             }
             catch (e) {
               console.error(e)
