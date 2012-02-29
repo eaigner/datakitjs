@@ -6,7 +6,7 @@ var express = require("express"),
     doSync = require("sync"),
     app = {};
 
-// Private functions
+// private functions
 var _conf = {};
 var _db = {};
 var _createRoutes = function(path) {
@@ -19,6 +19,7 @@ var _createRoutes = function(path) {
   app.post(m("save"), _secureMethod(exports.saveObject));
   app.post(m("delete"), _secureMethod(exports.deleteObject));
   app.post(m("refresh"), _secureMethod(exports.refreshObject));
+  app.post(m("query"), _secureMethod(exports.query));
 }
 var _e = function(res, snm, err) {
   var eo = {"status": snm[0], "message": snm[1]};
@@ -41,7 +42,8 @@ var _ERR = {
   OBJECT_ID_INVALID: [102, "Object ID invalid"],
   SAVE_FAILED: [200, "Save failed"],
   DELETE_FAILED: [300, "Delete failed"],
-  REFRESH_FAILED: [400, "Refresh failed"]
+  REFRESH_FAILED: [400, "Refresh failed"],
+  QUERY_FAILED: [500, "Query failed"]
 }
 var _def = function(v) {
   return (typeof v !== "undefined");
@@ -62,8 +64,11 @@ var _secureMethod = function(m) {
     res.send(401);
   });
 }
+var _copyKeys = function(s, t) {
+  for (key in s) t[key] = s[key];
+}
 
-// Exported functions
+// exported functions
 exports.run = function(c) {
   doSync(function() {
     var pad = "--------------------------------------------------------------------------------";
@@ -315,6 +320,43 @@ exports.refreshObject = function(req, res) {
     catch (e) {
       console.error(e);
       return _e(res, _ERR.REFRESH_FAILED, e);
+    }
+  })
+}
+exports.query = function(req, res) {
+  doSync(function() {
+    var entity = req.param("entity", null);
+    if (!_exists(entity)) {
+      return _e(res, _ERR.ENTITY_NOT_SET);
+    }
+    var feql = req.param("eql", null);
+    
+    // build query
+    var query = {}
+    if (_exists(feql)) _copyKeys(feql, query);
+    
+    try {  
+      var collection = _db.collection.sync(_db, entity);
+      var cursor = collection.find.sync(collection, query);
+      var results = cursor.toArray.sync(cursor);
+      
+      var resultCount = Object.keys(results).length;
+      if (resultCount > 1000) {
+        console.log(_c.yellow + "warning: query",
+                    entity,
+                    "->",
+                    query,
+                    "returned",
+                    resultCount,
+                    "results, may impact server performance negatively. try to optimize the query!",
+                    _c.reset);
+      }
+      
+      res.send(results, 200);
+    }
+    catch (e) {
+      console.error(e);
+      return _e(res, _ERR.QUERY_FAILED, e);
     }
   })
 }
