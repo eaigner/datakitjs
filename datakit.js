@@ -211,7 +211,7 @@ exports.saveObject = function(req, res) {
       return _e(res, _ERR.ENTITY_NOT_SET);
     }
     var oidStr = req.param("oid", null);
-    var fset = req.param("set", null);
+    var fset = req.param("set", {});
     var funset = req.param("unset", null);
     var finc = req.param("inc", null);
     var fpush = req.param("push", null);
@@ -227,6 +227,7 @@ exports.saveObject = function(req, res) {
       }
     }
     try {
+      var ts = parseInt((new Date().getTime()) / 1000);
       var collection = _db.collection.sync(_db, entity);
       var doc;
       if (oid !== null) {
@@ -246,9 +247,11 @@ exports.saveObject = function(req, res) {
         }
         if (_exists(fpop)) update["$pop"] = fpop;
         if (_exists(fpullAll)) update["$pullAll"] = fpullAll;
+        fset["_updated"] = ts;
         doc = collection.findAndModify.sync(collection, {"_id": oid}, [], update, opts);
       }
       else {
+        fset["_updated"] = ts;
         doc = collection.insert.sync(collection, fset);
       }
       if (doc.length > 0) {
