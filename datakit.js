@@ -330,12 +330,15 @@ exports.query = function(req, res) {
       return _e(res, _ERR.ENTITY_NOT_SET);
     }
     var feql = req.param("eql", null);
+    var fglt = req.param("glt", null);
     
     // build query
     var query = {}
     if (_exists(feql)) _copyKeys(feql, query);
-    
-    try {  
+    if (_exists(fglt)) _copyKeys(fglt, query);
+    try {
+      // TODO: remove debug query log
+      console.log("query", entity, "=>", query);
       var collection = _db.collection.sync(_db, entity);
       var cursor = collection.find.sync(collection, query);
       var results = cursor.toArray.sync(cursor);
