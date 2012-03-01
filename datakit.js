@@ -331,10 +331,12 @@ exports.query = function(req, res) {
     }
     var query = req.param("q", {});
     var or = req.param("or", null);
+    var and = req.param("and", null);
     if (_exists(or)) query["$or"] = or;
+    if (_exists(and)) query["$and"] = and;
     try {
       // TODO: remove debug query log
-      console.log("query", entity, "=>", query);
+      console.log("query", entity, "=>", JSON.stringify(query));
       var collection = _db.collection.sync(_db, entity);
       var cursor = collection.find.sync(collection, query);
       var results = cursor.toArray.sync(cursor);
