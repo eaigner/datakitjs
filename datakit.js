@@ -329,13 +329,9 @@ exports.query = function(req, res) {
     if (!_exists(entity)) {
       return _e(res, _ERR.ENTITY_NOT_SET);
     }
-    var feql = req.param("eql", null);
-    var fglt = req.param("glt", null);
-    
-    // build query
-    var query = {}
-    if (_exists(feql)) _copyKeys(feql, query);
-    if (_exists(fglt)) _copyKeys(fglt, query);
+    var query = req.param("q", {});
+    var or = req.param("or", null);
+    if (_exists(or)) query["$or"] = or;
     try {
       // TODO: remove debug query log
       console.log("query", entity, "=>", query);
