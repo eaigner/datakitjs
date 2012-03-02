@@ -330,15 +330,31 @@ exports.query = function(req, res) {
       return _e(res, _ERR.ENTITY_NOT_SET);
     }
     var query = req.param("q", {});
+    var opts = {};
     var or = req.param("or", null);
     var and = req.param("and", null);
+    var sort = req.param("sort", null);
+    var skip = req.param("skip", null);
+    var limit = req.param("limit", null);
+    
     if (_exists(or)) query["$or"] = or;
     if (_exists(and)) query["$and"] = and;
+    if (_exists(sort)) {
+      var sortValues = [];
+      for (key in sort) {
+        var order = (sort[key] === 1) ? "asc" : "desc";
+        sortValues.push([key, order]);
+      }
+      opts["sort"] = sortValues;
+    }
+    if (_exists(skip)) opts["skip"] = parseInt(skip);
+    if (_exists(limit)) opts["limit"] = parseInt(limit);
+    
     try {
       // TODO: remove debug query log
-      console.log("query", entity, "=>", JSON.stringify(query));
+      console.log("query", entity, "=>", JSON.stringify(query), JSON.stringify(opts));
       var collection = _db.collection.sync(_db, entity);
-      var cursor = collection.find.sync(collection, query);
+      var cursor = collection.find.sync(collection, query, opts);
       var results = cursor.toArray.sync(cursor);
       
       var resultCount = Object.keys(results).length;
