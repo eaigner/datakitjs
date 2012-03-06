@@ -67,6 +67,28 @@ var _secureMethod = function(m) {
 var _copyKeys = function(s, t) {
   for (key in s) t[key] = s[key];
 }
+var _traverse = function(o, func) {
+  for (i in o) {
+    func.apply(o, [i, o[i]]);
+    if (typeof(o[i]) == "object") {
+      _traverse(o[i], func);
+    }
+  }
+}
+var _decodeDkObj = function(o) {
+  _traverse(o, function(key, value) {
+    if (key === "dkdata!") {
+      this[key] = new Buffer(value, "base64");
+    }
+  });
+}
+var _encodeDkObj = function(o) {
+  _traverse(o, function(key, value) {
+    if (key === "dkdata!") {
+      this[key] = value.toString("base64");
+    }
+  });
+}
 
 // exported functions
 exports.run = function(c) {
@@ -225,6 +247,13 @@ exports.saveObject = function(req, res) {
     var fpop = req.param("pop", null);
     var fpullAll = req.param("pullAll", null);
     var oid = null;
+    
+    _decodeDkObj(fset);
+    _decodeDkObj(fpush);
+    _decodeDkObj(fpushAll);
+    _decodeDkObj(faddToSet);
+    _decodeDkObj(fpullAll);
+    
     if (_exists(oidStr)) {
       oid = new mongo.ObjectID(oidStr);
       if (!_exists(oid)) {
@@ -262,6 +291,9 @@ exports.saveObject = function(req, res) {
       if (doc.length > 0) {
         doc = doc[0];
       }
+      
+      _encodeDkObj(doc);
+      
       res.json(doc, 200);
     }
     catch (e) {
@@ -315,6 +347,9 @@ exports.refreshObject = function(req, res) {
       if (!_exists(result)) {
         throw "Could not find object";
       }
+      
+      _encodeDkObj(result);
+      
       res.send(result, 200);
     }
     catch (e) {
@@ -350,6 +385,13 @@ exports.query = function(req, res) {
     if (_exists(skip)) opts["skip"] = parseInt(skip);
     if (_exists(limit)) opts["limit"] = parseInt(limit);
     
+    // replace oid strings with oid objects
+    _traverse(query, function(key, value) {
+      if (key == "_id") {
+        this[key] = new mongo.ObjectID(value);
+      }
+    });
+    
     try {
       // TODO: remove debug query log
       console.log("query", entity, "=>", JSON.stringify(query), JSON.stringify(opts));
@@ -368,6 +410,8 @@ exports.query = function(req, res) {
                     "results, may impact server performance negatively. try to optimize the query!",
                     _c.reset);
       }
+      
+      _encodeDkObj(results)
       
       res.send(results, 200);
     }
