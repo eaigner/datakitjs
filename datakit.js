@@ -104,6 +104,7 @@ exports.run = function(c) {
     _conf.secret = _safe(c.secret, null);
     _conf.cert = _safe(c.cert, null);
     _conf.key = _safe(c.key, null);
+    _conf.express = _safe(c.express, function(app){});
     
     if (_exists(_conf.cert) && _exists(_conf.key)) {
       app = express.createServer({
@@ -137,7 +138,8 @@ exports.run = function(c) {
 
     // Create API routes
     _createRoutes(_conf.path);
-
+    _conf.express(app);
+    
     // Connect to DB and run
     var srv = new mongo.Server(_conf.dbhost, _conf.dbport, {});
     var db = new mongo.Db(_conf.db, srv);
