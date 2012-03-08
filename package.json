@@ -1,6 +1,6 @@
 {
   "name": "datakit",
-  "description": "DataKit module for node",
+  "description": "DataKit server",
   "author": "Erik Aigner <erik@chocomoko.com>",
   "version": "0.6.8",
   "dependencies": {

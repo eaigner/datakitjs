@@ -20,13 +20,25 @@ var _createRoutes = function(path) {
   app.post(m("delete"), _secureMethod(exports.deleteObject));
   app.post(m("refresh"), _secureMethod(exports.refreshObject));
   app.post(m("query"), _secureMethod(exports.query));
+  app.post(m("index"), _secureMethod(exports.index));
 }
 var _e = function(res, snm, err) {
   var eo = {"status": snm[0], "message": snm[1]};
-  if (_exists(err)) {
+  var me = _parseMongoException(err);
+  if (me !== null) {
+    eo.err = me.message;
+  }
+  else if (_exists(err)) {
     eo.err = String(err);
   }
   return res.json(eo, 400);
+}
+var _parseMongoException = function(e) {
+  var lastErr = e.lastErrorObject;
+  if (_exists(lastErr)) {
+    return {'status': lastErr.code, 'message': lastErr.err};
+  }
+  return null;
 }
 var _c = {
   red: "\u001b[31m",
@@ -38,12 +50,15 @@ var _c = {
 }
 var _ERR = {
   ENTITY_NOT_SET: [100, "Entity not set"],
-  OBJECT_ID_NOT_SET: [101, "Object ID not set"],
-  OBJECT_ID_INVALID: [102, "Object ID invalid"],
+  ENTITY_KEY_NOT_SET: [101, "Entity key not set"],
+  OBJECT_ID_NOT_SET: [102, "Object ID not set"],
+  OBJECT_ID_INVALID: [103, "Object ID invalid"],
   SAVE_FAILED: [200, "Save failed"],
+  SAVE_FAILED_DUPLICATE_KEY: [201, "Save failed because of a duplicate key"],
   DELETE_FAILED: [300, "Delete failed"],
   REFRESH_FAILED: [400, "Refresh failed"],
-  QUERY_FAILED: [500, "Query failed"]
+  QUERY_FAILED: [500, "Query failed"],
+  INDEX_FAILED: [600, "Index failed"]
 }
 var _def = function(v) {
   return (typeof v !== "undefined");
@@ -420,6 +435,34 @@ exports.query = function(req, res) {
     catch (e) {
       console.error(e);
       return _e(res, _ERR.QUERY_FAILED, e);
+    }
+  })
+}
+exports.index = function(req, res) {
+  doSync(function() {
+    var entity = req.param("entity", null);
+    var key = req.param("key", null);
+    var unique = req.param("unique", false);
+    var drop = req.param("drop", false);
+    if (!_exists(entity)) {
+      return _e(res, _ERR.ENTITY_NOT_SET);
+    }
+    if (!_exists(key)) {
+      return _e(res, _ERR.ENTITY_KEY_NOT_SET);
+    }
+    try {
+      var opts = {
+        "safe": true,
+        "unique": unique,
+        "dropDups": drop
+      }
+      var collection = _db.collection.sync(_db, entity);
+      var cursor = collection.ensureIndex.sync(collection, {key: 1}, opts);
+      
+      return res.send('', 200);
+    }
+    catch (e) {
+      return _e(res, _ERR.INDEX_FAILED, e);
     }
   })
 }
