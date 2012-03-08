@@ -250,84 +250,91 @@ exports.publishObject = function(req, res) {
 }
 exports.saveObject = function(req, res) {
   doSync(function() {
-    var entity = req.param("entity", null);
-    if (!_exists(entity)) {
-      return _e(res, _ERR.ENTITY_NOT_SET);
-    }
-    var oidStr = req.param("oid", null);
-    var fset = req.param("set", {});
-    var funset = req.param("unset", null);
-    var finc = req.param("inc", null);
-    var fpush = req.param("push", null);
-    var fpushAll = req.param("pushAll", null);
-    var faddToSet = req.param("addToSet", null);
-    var fpop = req.param("pop", null);
-    var fpullAll = req.param("pullAll", null);
-    var oid = null;
+    var entities = req.body;
+    var results = [];
     
-    _decodeDkObj(fset);
-    _decodeDkObj(fpush);
-    _decodeDkObj(fpushAll);
-    _decodeDkObj(faddToSet);
-    _decodeDkObj(fpullAll);
-    
-    if (_exists(oidStr)) {
-      oid = new mongo.ObjectID(oidStr);
-      if (!_exists(oid)) {
-        return _e(res, _ERR.OBJECT_ID_INVALID);
+    for (var i in entities) {
+      var ent = entities[i];
+      var entity = _safe(ent['entity'], null);
+      if (!_exists(entity)) {
+        return _e(res, _ERR.ENTITY_NOT_SET);
       }
-    }
-    try {
-      var ts = parseInt((new Date().getTime()) / 1000);
-      var collection = _db.collection.sync(_db, entity);
-      var doc;
-      var isNew = (oid === null);
-      
-      // Automatically insert the update timestamp
-      fset["_updated"] = ts;
-      
-      // Insert new object
-      if (isNew) {
-        doc = collection.insert.sync(collection, fset);
-        oid = doc[0]['_id'];
-      }
-      
-      // Update instead if oid exists, or an operation needs to be executed
-      // that requires an insert first.
-      var opts = {"upsert": true, "new": true};
-      var update = {};
-      if (_exists(fset) && !isNew) update["$set"] = fset;
-      if (_exists(funset)) update["$unset"] = funset;
-      if (_exists(finc)) update["$inc"] = finc;
-      if (_exists(fpush)) update["$push"] = fpush;
-      if (_exists(fpushAll)) update["$pushAll"] = fpushAll;
-      if (_exists(faddToSet)) {
-        var ats = {}
-        for (var key in faddToSet) {
-           ats[key] = {"$each": faddToSet[key]};
+      var oidStr = _safe(ent['oid'], null);
+      var fset = _safe(ent['set'], {});
+      var funset = _safe(ent['unset'], null);
+      var finc = _safe(ent['inc'], null);
+      var fpush = _safe(ent['push'], null);
+      var fpushAll = _safe(ent['pushAll'], null);
+      var faddToSet = _safe(ent['addToSet'], null);
+      var fpop = _safe(ent['pop'], null);
+      var fpullAll = _safe(ent['pullAll'], null);
+      var oid = null;
+
+      _decodeDkObj(fset);
+      _decodeDkObj(fpush);
+      _decodeDkObj(fpushAll);
+      _decodeDkObj(faddToSet);
+      _decodeDkObj(fpullAll);
+
+      if (_exists(oidStr)) {
+        oid = new mongo.ObjectID(oidStr);
+        if (!_exists(oid)) {
+          return _e(res, _ERR.OBJECT_ID_INVALID);
         }
-        update["$addToSet"] = ats;
       }
-      if (_exists(fpop)) update["$pop"] = fpop;
-      if (_exists(fpullAll)) update["$pullAll"] = fpullAll;
-      
-      // Find and modify
-      if (!isNew || (isNew && Object.keys(update).length > 0)) {
-        doc = collection.findAndModify.sync(collection, {"_id": oid}, [], update, opts);
+      try {
+        var ts = parseInt((new Date().getTime()) / 1000);
+        var collection = _db.collection.sync(_db, entity);
+        var doc;
+        var isNew = (oid === null);
+
+        // Automatically insert the update timestamp
+        fset["_updated"] = ts;
+
+        // Insert new object
+        if (isNew) {
+          doc = collection.insert.sync(collection, fset);
+          oid = doc[0]['_id'];
+        }
+
+        // Update instead if oid exists, or an operation needs to be executed
+        // that requires an insert first.
+        var opts = {"upsert": true, "new": true};
+        var update = {};
+        if (_exists(fset) && !isNew) update["$set"] = fset;
+        if (_exists(funset)) update["$unset"] = funset;
+        if (_exists(finc)) update["$inc"] = finc;
+        if (_exists(fpush)) update["$push"] = fpush;
+        if (_exists(fpushAll)) update["$pushAll"] = fpushAll;
+        if (_exists(faddToSet)) {
+          var ats = {}
+          for (var key in faddToSet) {
+             ats[key] = {"$each": faddToSet[key]};
+          }
+          update["$addToSet"] = ats;
+        }
+        if (_exists(fpop)) update["$pop"] = fpop;
+        if (_exists(fpullAll)) update["$pullAll"] = fpullAll;
+
+        // Find and modify
+        if (!isNew || (isNew && Object.keys(update).length > 0)) {
+          doc = collection.findAndModify.sync(collection, {"_id": oid}, [], update, opts);
+        }
+
+        if (doc.length > 0) {
+          doc = doc[0];
+        }
+
+        _encodeDkObj(doc);
+        
+        results.push(doc);
       }
-      
-      if (doc.length > 0) {
-        doc = doc[0];
+      catch (e) {
+        console.error(e);
+        return _e(res, _ERR.SAVE_FAILED, e);
       }
-      
-      _encodeDkObj(doc);
-      
-      res.json(doc, 200);
-    }
-    catch (e) {
-      console.error(e);
-      return _e(res, _ERR.SAVE_FAILED, e);
-    }
+    }    
+    res.json(results, 200);
   })
 }
 exports.deleteObject = function(req, res) {
