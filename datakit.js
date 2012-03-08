@@ -252,6 +252,7 @@ exports.saveObject = function(req, res) {
   doSync(function() {
     var entities = req.body;
     var results = [];
+    var errors = [];
     
     for (var i in entities) {
       var ent = entities[i];
@@ -331,9 +332,12 @@ exports.saveObject = function(req, res) {
       }
       catch (e) {
         console.error(e);
-        return _e(res, _ERR.SAVE_FAILED, e);
+        errors.push(e);
       }
-    }    
+    }
+    if (errors.length > 0) {
+      return _e(res, _ERR.SAVE_FAILED, errors.pop());
+    }
     res.json(results, 200);
   })
 }
