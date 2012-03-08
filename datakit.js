@@ -281,30 +281,41 @@ exports.saveObject = function(req, res) {
       var ts = parseInt((new Date().getTime()) / 1000);
       var collection = _db.collection.sync(_db, entity);
       var doc;
-      if (oid !== null) {
-        var opts = {"upsert": true, "new": true};
-        var update = {};
-        if (_exists(fset)) update["$set"] = fset;
-        if (_exists(funset)) update["$unset"] = funset;
-        if (_exists(finc)) update["$inc"] = finc;
-        if (_exists(fpush)) update["$push"] = fpush;
-        if (_exists(fpushAll)) update["$pushAll"] = fpushAll;
-        if (_exists(faddToSet)) {
-          var ats = {}
-          for (var key in faddToSet) {
-             ats[key] = {"$each": faddToSet[key]};
-          }
-          update["$addToSet"] = ats;
+      var isNew = (oid === null);
+      
+      // Automatically insert the update timestamp
+      fset["_updated"] = ts;
+      
+      // Insert new object
+      if (isNew) {
+        doc = collection.insert.sync(collection, fset);
+        oid = doc[0]['_id'];
+      }
+      
+      // Update instead if oid exists, or an operation needs to be executed
+      // that requires an insert first.
+      var opts = {"upsert": true, "new": true};
+      var update = {};
+      if (_exists(fset) && !isNew) update["$set"] = fset;
+      if (_exists(funset)) update["$unset"] = funset;
+      if (_exists(finc)) update["$inc"] = finc;
+      if (_exists(fpush)) update["$push"] = fpush;
+      if (_exists(fpushAll)) update["$pushAll"] = fpushAll;
+      if (_exists(faddToSet)) {
+        var ats = {}
+        for (var key in faddToSet) {
+           ats[key] = {"$each": faddToSet[key]};
         }
-        if (_exists(fpop)) update["$pop"] = fpop;
-        if (_exists(fpullAll)) update["$pullAll"] = fpullAll;
-        fset["_updated"] = ts;
+        update["$addToSet"] = ats;
+      }
+      if (_exists(fpop)) update["$pop"] = fpop;
+      if (_exists(fpullAll)) update["$pullAll"] = fpullAll;
+      
+      // Find and modify
+      if (!isNew || (isNew && Object.keys(update).length > 0)) {
         doc = collection.findAndModify.sync(collection, {"_id": oid}, [], update, opts);
       }
-      else {
-        fset["_updated"] = ts;
-        doc = collection.insert.sync(collection, fset);
-      }
+      
       if (doc.length > 0) {
         doc = doc[0];
       }
