@@ -389,7 +389,7 @@ exports.refreshObject = function(req, res) {
       
       _encodeDkObj(result);
       
-      res.send(result, 200);
+      res.json(result, 200);
     }
     catch (e) {
       console.error(e);
@@ -403,6 +403,8 @@ exports.query = function(req, res) {
     if (!_exists(entity)) {
       return _e(res, _ERR.ENTITY_NOT_SET);
     }
+    var doFindOne = req.param('findOne', false);
+    var doCount = req.param('count', false);
     var query = req.param("q", {});
     var opts = {};
     var or = req.param("or", null);
@@ -434,25 +436,41 @@ exports.query = function(req, res) {
     try {
       // TODO: remove debug query log
       console.log("query", entity, "=>", JSON.stringify(query), JSON.stringify(opts));
-      var collection = _db.collection.sync(_db, entity);
-      var cursor = collection.find.sync(collection, query, opts);
-      var results = cursor.toArray.sync(cursor);
       
-      var resultCount = Object.keys(results).length;
-      if (resultCount > 1000) {
-        console.log(_c.yellow + "warning: query",
-                    entity,
-                    "->",
-                    query,
-                    "returned",
-                    resultCount,
-                    "results, may impact server performance negatively. try to optimize the query!",
-                    _c.reset);
+      var results;
+      var cursor;
+      var collection = _db.collection.sync(_db, entity);
+      
+      if (doFindOne) {
+        var result = collection.findOne.sync(collection, query, opts);
+        results = [result];
+      }
+      else {
+        cursor = collection.find.sync(collection, query, opts);
+        
+        if (doCount) {
+          results = cursor.count.sync(cursor);
+        }
+        else {
+          results = cursor.toArray.sync(cursor);
+
+          var resultCount = Object.keys(results).length;
+          if (resultCount > 1000) {
+            console.log(_c.yellow + "warning: query",
+                        entity,
+                        "->",
+                        query,
+                        "returned",
+                        resultCount,
+                        "results, may impact server performance negatively. try to optimize the query!",
+                        _c.reset);
+          }
+        }
       }
       
       _encodeDkObj(results)
       
-      res.send(results, 200);
+      return res.json(results, 200);
     }
     catch (e) {
       console.error(e);

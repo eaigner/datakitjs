@@ -9,7 +9,7 @@
     "sync": "v0.2.0"
   },
   "scripts": {
-    "sv": "supervisor -n error -w bin,lib,. run.js"
+    "start": "supervisor -n error -w bin,lib,. run.js"
   },
   "engines": {
     "node" : ">=0.6.8"
