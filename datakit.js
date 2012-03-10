@@ -92,14 +92,14 @@ var _traverse = function(o, func) {
 }
 var _decodeDkObj = function(o) {
   _traverse(o, function(key, value) {
-    if (key === "dkdata!") {
+    if (key === "dk:data") {
       this[key] = new Buffer(value, "base64");
     }
   });
 }
 var _encodeDkObj = function(o) {
   _traverse(o, function(key, value) {
-    if (key === "dkdata!") {
+    if (key === "dk:data") {
       this[key] = value.toString("base64");
     }
   });
