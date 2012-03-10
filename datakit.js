@@ -118,7 +118,7 @@ var _encodeDkObj = function (o) {
 };
 var _generateNextSequenceNumber = function (entity) {
   var col, doc;
-  col = _db.collection.sync(_db, '_datakit:seq');
+  col = _db.collection.sync(_db, 'DataKit:Sequence');
   col.insert.sync(col, {'_id': entity, 'seq': new mongo.Long(0)});
   doc = col.findAndModify.sync(
     col,
