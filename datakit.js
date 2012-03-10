@@ -435,7 +435,7 @@ exports.refreshObject = function (req, res) {
 };
 exports.query = function (req, res) {
   doSync(function querySync() {
-    var entity, doFindOne, doCount, query, opts, or, and, sort, skip, limit, rlimit, sortValues, order, results, cursor, collection, result, key, resultCount;
+    var entity, doFindOne, doCount, query, opts, or, and, sort, skip, limit, rand, sortValues, order, results, cursor, collection, result, key, resultCount;
     entity = req.param('entity', null);
     if (!_exists(entity)) {
       return _e(res, _ERR.ENTITY_NOT_SET);
@@ -449,7 +449,7 @@ exports.query = function (req, res) {
     sort = req.param('sort', null);
     skip = req.param('skip', null);
     limit = req.param('limit', null);
-    rlimit = req.param('rlimit', 0);
+    rand = req.param('rand', false);
 
     if (_exists(or)) {
       query.$or = or;
@@ -487,9 +487,9 @@ exports.query = function (req, res) {
 
       collection = _db.collection.sync(_db, entity);
 
-      if (rlimit > 0) {
+      if (rand) {
         if (doFindOne) {
-          rlimit = 1;
+          limit = 1;
         }
         results = collection.mapReduce.sync(
           collection,
@@ -503,7 +503,7 @@ exports.query = function (req, res) {
             });
             return {a: a.sort(function (a, b) {
               return a.v - b.v;
-            }).slice(0, rlimit)};
+            }).slice(0, limit)};
           },
           {
             'finalize': function finalize(k, v) {
@@ -513,7 +513,7 @@ exports.query = function (req, res) {
             },
             'query': query,
             'out': {'inline': 1},
-            'scope': {'rlimit': rlimit}
+            'scope': {'limit': limit}
           }
         );
         results = results[0].value;
