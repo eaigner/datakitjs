@@ -37,7 +37,7 @@ var _createRoutes = function (path) {
     return path + '/' + _safe(p, '');
   };
   app.get(m(), exports.info);
-  app.get(m('public/:obj'), exports.public);
+  app.get(m('public/:key'), exports.public);
   app.post(m('publish'), _secureMethod(exports.publishObject));
   app.post(m('save'), _secureMethod(exports.saveObject));
   app.post(m('delete'), _secureMethod(exports.deleteObject));
@@ -81,7 +81,8 @@ var _ERR = {
   DELETE_FAILED: [300, 'Delete failed'],
   REFRESH_FAILED: [400, 'Refresh failed'],
   QUERY_FAILED: [500, 'Query failed'],
-  INDEX_FAILED: [600, 'Index failed']
+  INDEX_FAILED: [600, 'Index failed'],
+  PUBLISH_FAILED: [700, 'Publish failed']
 };
 var _copyKeys = function (s, t) {
   var key;
@@ -198,57 +199,37 @@ exports.info = function (req, res) {
 };
 exports.public = function (req, res) {
   doSync(function publicSync() {
-    var obj, objBuf, decipher, dec, c, entity, oid, fields, collection, result;
-    obj = req.param('obj', null);
-    if (_exists(obj)) {
-      obj = obj.replace(/-/g, '+').replace(/_/g, '/');
-      objBuf = new Buffer(obj, 'base64');
-      decipher = crypto.createDecipher('aes-256-cbc', _conf.secret);
-      dec = decipher.update(objBuf, 'binary', 'utf8');
-      dec += decipher.final('utf8');
-
-      if (_exists(dec) && dec.length > 0) {
-        c = dec.split(':');
-        if (c.length > 1) {
-          entity = c[0];
-          oid = null;
-          try {
-            oid = new mongo.ObjectID(c[1]);
-          } catch (e) {
-            // ignore invalid oid errors, check for null oid in next stepx
-          }
-          if (oid !== null && entity.length > 0) {
-            fields = [];
-            if (c.length > 2) {
-              fields = c.splice(2, c.length - 1);
-            }
-            try {
-              collection = _db.collection.sync(_db, entity);
-              result = collection.findOne.sync(collection, {'_id': oid}, fields);
-              if (_exists(result)) {
-                delete result._id;
-                // if only one field was requested we return the data of that field
-                // directly instead of the JSON representation
-                if (fields.length === 1) {
-                  res.send(result[fields[0]], 200);
-                } else {
-                  res.json(result, 200);
-                }
-                return;
-              }
-            } catch (e2) {
-              console.error(e2);
-            }
-          }
-        }
-      }
+    var key, col, result, oid, fields;
+    key = req.param('key', null);
+    if (!_exists(key)) {
+      return res.send(404);
     }
-    res.send(404);
+
+    try {
+      col = _db.collection.sync(_db, 'DataKit:Public');
+      result = col.findOne.sync(col, {'_id': key});
+
+      oid = new mongo.ObjectID(result.q.oid);
+      fields = result.q.fields;
+
+      col = _db.collection.sync(_db, result.q.entity);
+      result = col.findOne.sync(col, {'_id': oid}, fields);
+
+      if (fields.length === 1) {
+        return res.send(result[fields[0]], 200);
+      } else {
+        return res.json(result, 200);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    return res.send(404);
   });
 };
 exports.publishObject = function (req, res) {
   doSync(function publishSync() {
-    var entity, oid, fields, str, cipher, enc, base64, urlSafeBase64;
+    var entity, oid, fields, query, signature, shasum, key, col; //, cipher, enc, base64, urlSafeBase64;
     entity = req.param('entity', null);
     if (!_exists(entity)) {
       return _e(res, _ERR.ENTITY_NOT_SET);
@@ -258,17 +239,29 @@ exports.publishObject = function (req, res) {
       return _e(res, _ERR.OBJECT_ID_INVALID);
     }
     fields = req.param('fields', null);
-    str = entity + ':' + oid;
+    query = {
+      'entity': entity,
+      'oid': oid,
+      'fields': []
+    };
     if (fields !== null && fields.length > 0) {
-      str += ':' + fields.join(':');
+      query.fields = fields;
     }
-    cipher = crypto.createCipher('aes-256-cbc', _conf.secret);
-    enc = cipher.update(str, 'utf8', 'hex');
-    enc += cipher.final('hex');
-    base64 = new Buffer(enc, 'hex').toString('base64');
-    urlSafeBase64 = base64.replace(/\+/g, '-').replace(/\//g, '_');
 
-    res.json(urlSafeBase64, 200);
+    signature = _conf.secret + query;
+    shasum = crypto.createHash('sha1');
+    shasum.update(signature);
+    key = shasum.digest('hex');
+
+    try {
+      col = _db.collection.sync(_db, 'DataKit:Public');
+      col.update.sync(col, {'_id': key}, {'$set': {'q': query}}, {'safe': true, 'upsert': true});
+
+      return res.json(key, 200);
+    } catch (e) {
+      console.error(e);
+      return _e(res, _ERR.PUBLISH_FAILED, e);
+    }
   });
 };
 exports.saveObject = function (req, res) {
