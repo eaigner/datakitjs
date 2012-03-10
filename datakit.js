@@ -435,14 +435,13 @@ exports.refreshObject = function (req, res) {
 };
 exports.query = function (req, res) {
   doSync(function querySync() {
-    var entity, doFindOne, doCount, mrand, query, opts, or, and, sort, skip, limit, sortValues, order, results, cursor, collection, result, key, resultCount;
+    var entity, doFindOne, doCount, query, opts, or, and, sort, skip, limit, rlimit, sortValues, order, results, cursor, collection, result, key, resultCount;
     entity = req.param('entity', null);
     if (!_exists(entity)) {
       return _e(res, _ERR.ENTITY_NOT_SET);
     }
     doFindOne = req.param('findOne', false);
     doCount = req.param('count', false);
-    mrand = req.param('mrand', 0);
     query = req.param('q', {});
     opts = {};
     or = req.param('or', null);
@@ -450,6 +449,7 @@ exports.query = function (req, res) {
     sort = req.param('sort', null);
     skip = req.param('skip', null);
     limit = req.param('limit', null);
+    rlimit = req.param('rlimit', 0);
 
     if (_exists(or)) {
       query.$or = or;
@@ -487,7 +487,10 @@ exports.query = function (req, res) {
 
       collection = _db.collection.sync(_db, entity);
 
-      if (mrand > 0) {
+      if (rlimit > 0) {
+        if (doFindOne) {
+          rlimit = 1;
+        }
         results = collection.mapReduce.sync(
           collection,
           function map() {
@@ -500,7 +503,7 @@ exports.query = function (req, res) {
             });
             return {a: a.sort(function (a, b) {
               return a.v - b.v;
-            }).slice(0, mrand)};
+            }).slice(0, rlimit)};
           },
           {
             'finalize': function finalize(k, v) {
@@ -508,8 +511,9 @@ exports.query = function (req, res) {
                 return x.k;
               }) : [v.k];
             },
+            'query': query,
             'out': {'inline': 1},
-            'scope': {'mrand': mrand}
+            'scope': {'rlimit': rlimit}
           }
         );
         results = results[0].value;
