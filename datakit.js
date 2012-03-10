@@ -144,6 +144,7 @@ exports.run = function (c) {
     _conf.path = _safe(c.path, '');
     _conf.port = _safe(c.port, process.env.PORT || 3000);
     _conf.secret = _safe(c.secret, null);
+    _conf.salt = _safe(c.salt, "datakit");
     _conf.cert = _safe(c.cert, null);
     _conf.key = _safe(c.key, null);
     _conf.express = _safe(c.express, function (app) {});
@@ -248,7 +249,7 @@ exports.publishObject = function (req, res) {
       query.fields = fields;
     }
 
-    signature = _conf.secret + query;
+    signature = _conf.secret + _conf.salt + query;
     shasum = crypto.createHash('sha1');
     shasum.update(signature);
     key = shasum.digest('hex');
