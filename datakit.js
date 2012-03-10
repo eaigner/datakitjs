@@ -104,6 +104,19 @@ var _encodeDkObj = function(o) {
     }
   });
 }
+var _generateNextSequenceNumber = function(entity) {
+  var seqCollection = _db.collection.sync(_db, '_datakit:seq');
+      seqCollection.insert.sync(seqCollection, {'_id': entity, 'seq': new mongo.Long(0)});
+  var sequenceDoc = seqCollection.findAndModify.sync(
+    seqCollection,
+    {'_id': entity},
+    [],
+    {'$inc': {'seq': 1}},
+    {new: true}
+  );
+
+  return sequenceDoc.seq;
+}
 
 // exported functions
 exports.run = function(c) {
@@ -294,6 +307,8 @@ exports.saveObject = function(req, res) {
 
         // Insert new object
         if (isNew) {
+          // Generate new sequence number         
+          fset["_seq"] = _generateNextSequenceNumber(entity);
           doc = collection.insert.sync(collection, fset);
           oid = doc[0]['_id'];
         }
