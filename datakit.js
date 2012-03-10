@@ -186,7 +186,7 @@ exports.info = function(req, res) {
   res.send("datakit", 200);
 }
 exports.public = function(req, res) {
-  doSync(function() {
+  doSync(function publicSync() {
     var obj = req.param("obj", null);
     if (_exists(obj)) {
       obj = obj.replace(/-/g, "+").replace(/_/g, "/");
@@ -238,7 +238,7 @@ exports.public = function(req, res) {
   })
 }
 exports.publishObject = function(req, res) {
-  doSync(function() {
+  doSync(function publishSync() {
     var entity = req.param("entity", null);
     if (!_exists(entity)) {
       return _e(res, _ERR.ENTITY_NOT_SET);
@@ -262,7 +262,7 @@ exports.publishObject = function(req, res) {
   })
 }
 exports.saveObject = function(req, res) {
-  doSync(function() {
+  doSync(function saveSync() {
     var entities = req.body;
     var results = [];
     var errors = [];
@@ -357,7 +357,7 @@ exports.saveObject = function(req, res) {
   })
 }
 exports.deleteObject = function(req, res) {
-  doSync(function() {
+  doSync(function deleteSync() {
     var entity = req.param("entity", null);
     var oidStr = req.param("oid", null);
     if (!_exists(entity)) {
@@ -382,7 +382,7 @@ exports.deleteObject = function(req, res) {
   })
 }
 exports.refreshObject = function(req, res) {
-  doSync(function() {
+  doSync(function refreshSync() {
     var entity = req.param("entity", null);
     var oidStr = req.param("oid", null);
     if (!_exists(entity)) {
@@ -413,13 +413,14 @@ exports.refreshObject = function(req, res) {
   })
 }
 exports.query = function(req, res) {
-  doSync(function() {
+  doSync(function querySync() {
     var entity = req.param("entity", null);
     if (!_exists(entity)) {
       return _e(res, _ERR.ENTITY_NOT_SET);
     }
     var doFindOne = req.param('findOne', false);
     var doCount = req.param('count', false);
+    var mrand = req.param('mrand', 0);
     var query = req.param("q", {});
     var opts = {};
     var or = req.param("or", null);
@@ -456,7 +457,34 @@ exports.query = function(req, res) {
       var cursor;
       var collection = _db.collection.sync(_db, entity);
       
-      if (doFindOne) {
+      if (mrand > 0) {
+        results = collection.mapReduce.sync(
+          collection,
+          function map() { 
+            emit(0, {k: this, v: Math.random()}) 
+          },
+          function reduce(k, v) {
+            var a = []
+            v.forEach(function(x) {
+              a = a.concat(x.a ? x.a : x)
+            })
+            return {a:a.sort(function(a, b) {
+              return a.v - b.v;
+            }).slice(0, mrand)}; 
+          },
+          {
+            'finalize': function finalize(k, v) {
+              return v.a ? v.a.map(function(x) {
+                return x.k
+              }) : [v.k]
+            },
+            'out': {'inline': 1},
+            'scope': {'mrand': mrand}
+          }
+        );
+        results = results[0].value;
+      }
+      else if (doFindOne) {
         var result = collection.findOne.sync(collection, query, opts);
         results = [result];
       }
@@ -494,7 +522,7 @@ exports.query = function(req, res) {
   })
 }
 exports.index = function(req, res) {
-  doSync(function() {
+  doSync(function indexSync() {
     var entity = req.param("entity", null);
     var key = req.param("key", null);
     var unique = req.param("unique", false);
