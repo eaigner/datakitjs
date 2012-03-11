@@ -497,13 +497,18 @@ exports.query = function (req, res) {
             emit(0, {k: this, v: Math.random()});
           },
           function reduce(k, v) {
-            var a = [];
+            var a, s;
+            a = [];
             v.forEach(function (x) {
               a = a.concat(x.a || x);
             });
-            return {a: a.sort(function (a, b) {
+            s = a.sort(function (a, b) {
               return a.v - b.v;
-            }).slice(0, limit)};
+            });
+            if (limit > 0) {
+              s = s.slice(0, limit);
+            }
+            return {a: s};
           },
           {
             'finalize': function finalize(k, v) {
