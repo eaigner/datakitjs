@@ -1,4 +1,4 @@
-/*jslint node: true, es5: true, nomen: true, indent: 2*/
+/*jslint node: true, es5: true, nomen: true, regexp: true, indent: 2*/
 /*global emit*/
 "use strict";
 
@@ -53,13 +53,17 @@ var _parseMongoException = function (e) {
   return null;
 };
 var _e = function (res, snm, err) {
-  var eo, me;
+  var eo, me, stackLines;
   eo = {'status': snm[0], 'message': snm[1]};
   me = _parseMongoException(err);
   if (me !== null) {
     eo.err = me.message;
   } else if (_exists(err)) {
-    eo.err = String(err);
+    eo.err = String(err.message);
+    stackLines = err.stack.split(/\n/g);
+    stackLines[1].replace(/at\s+\S*?([^\/]+):(\d+):(\d+)/g, function (a, f, l, c) {
+      eo.line = [f, l, c].join(":");
+    });
   }
   return res.json(eo, 400);
 };
