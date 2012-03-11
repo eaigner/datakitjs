@@ -135,11 +135,17 @@ var _generateNextSequenceNumber = function (entity) {
 
   return doc.seq;
 };
+// prototypes
+String.prototype.repeat = function (num) {
+  var a = [];
+  a.length = parseInt(num, 10) + 1;
+  return a.join(this);
+};
 // exported functions
 exports.run = function (c) {
   doSync(function runSync() {
     var pad, nl, buf, srv, db;
-    pad = '--------------------------------------------------------------------------------';
+    pad = '-'.repeat(80);
     nl = '\n';
     console.log(nl + pad + nl + 'DATAKIT' + nl + pad);
     _conf.db = _safe(c.db, 'datakit');
@@ -439,7 +445,7 @@ exports.refreshObject = function (req, res) {
 };
 exports.query = function (req, res) {
   doSync(function querySync() {
-    var entity, doFindOne, doCount, query, opts, or, and, sort, skip, limit, rand, sortValues, order, results, cursor, collection, result, key, resultCount;
+    var entity, doFindOne, doCount, query, opts, or, and, sort, skip, limit, mr, mrOpts, sortValues, order, results, cursor, collection, result, key, resultCount;
     entity = req.param('entity', null);
     if (!_exists(entity)) {
       return _e(res, _ERR.ENTITY_NOT_SET);
@@ -453,7 +459,7 @@ exports.query = function (req, res) {
     sort = req.param('sort', null);
     skip = req.param('skip', null);
     limit = req.param('limit', null);
-    rand = req.param('rand', false);
+    mr = req.param('mr', null);
 
     if (_exists(or)) {
       query.$or = or;
@@ -491,39 +497,28 @@ exports.query = function (req, res) {
 
       collection = _db.collection.sync(_db, entity);
 
-      if (rand) {
-        if (doFindOne) {
-          limit = 1;
+      if (mr !== null) {
+        mrOpts = {
+          'query': query,
+          'out': {'inline': 1}
+        };
+        if (_exists(opts.sort)) {
+          mrOpts.sort = opts.sort;
+        }
+        if (_exists(opts.limit)) {
+          mrOpts.limit = opts.limit;
+        }
+        if (_exists(mr.context)) {
+          mrOpts.scope = mr.context;
+        }
+        if (_exists(mr.finalize)) {
+          mrOpts.finalize = mr.finalize;
         }
         results = collection.mapReduce.sync(
           collection,
-          function map() {
-            emit(0, {k: this, v: Math.random()});
-          },
-          function reduce(k, v) {
-            var a, s;
-            a = [];
-            v.forEach(function (x) {
-              a = a.concat(x.a || x);
-            });
-            s = a.sort(function (a, b) {
-              return a.v - b.v;
-            });
-            if (limit > 0) {
-              s = s.slice(0, limit);
-            }
-            return {a: s};
-          },
-          {
-            'finalize': function finalize(k, v) {
-              return v.a ? v.a.map(function (x) {
-                return x.k;
-              }) : [v.k];
-            },
-            'query': query,
-            'out': {'inline': 1},
-            'scope': {'limit': limit}
-          }
+          mr.map,
+          mr.reduce,
+          mrOpts
         );
         results = results[0].value;
       } else if (doFindOne) {
