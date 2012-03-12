@@ -53,7 +53,7 @@ var _parseMongoException = function (e) {
   return null;
 };
 var _e = function (res, snm, err) {
-  var eo, me, stackLines;
+  var eo, me, stackLines, l;
   eo = {'status': snm[0], 'message': snm[1]};
   me = _parseMongoException(err);
   if (me !== null) {
@@ -62,7 +62,8 @@ var _e = function (res, snm, err) {
     eo.err = String(err.message);
     stackLines = err.stack.split(/\n/g);
     stackLines[1].replace(/at\s+\S*?([^\/]+):(\d+):(\d+)/g, function (a, f, l, c) {
-      eo.line = [f, l, c].join(":");
+      l = [f, l, c].join(":");
+      console.error("error returned at", l);
     });
   }
   return res.json(eo, 400);
