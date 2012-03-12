@@ -521,7 +521,6 @@ exports.query = function (req, res) {
           mr.reduce,
           mrOpts
         );
-        results = results[0].value;
       } else if (doFindOne) {
         result = collection.findOne.sync(collection, query, opts);
         results = [result];
