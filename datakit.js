@@ -44,8 +44,12 @@ var _createRoutes = function (path) {
   app.post(m('refresh'), _secureMethod(exports.refreshObject));
   app.post(m('query'), _secureMethod(exports.query));
   app.post(m('index'), _secureMethod(exports.index));
+  app.post(m('destroy'), _secureMethod(exports.destroy));
 };
 var _parseMongoException = function (e) {
+  if (!_exists(e)) {
+    return null;
+  }
   var lastErr = e.lastErrorObject;
   if (_exists(lastErr)) {
     return {'status': lastErr.code, 'message': lastErr.err};
@@ -87,7 +91,9 @@ var _ERR = {
   REFRESH_FAILED: [400, 'Refresh failed'],
   QUERY_FAILED: [500, 'Query failed'],
   INDEX_FAILED: [600, 'Index failed'],
-  PUBLISH_FAILED: [700, 'Publish failed']
+  PUBLISH_FAILED: [700, 'Publish failed'],
+  DESTROY_FAILED: [800, 'Destroy failed'],
+  DESTROY_NOT_ALLOWED: [801, 'Destroy not allowed']
 };
 var _copyKeys = function (s, t) {
   var key;
@@ -156,6 +162,7 @@ exports.run = function (c) {
     _conf.port = _safe(c.port, process.env.PORT || 3000);
     _conf.secret = _safe(c.secret, null);
     _conf.salt = _safe(c.salt, "datakit");
+    _conf.allowDestroy = _safe(c.allowDestroy, false);
     _conf.cert = _safe(c.cert, null);
     _conf.key = _safe(c.key, null);
     _conf.express = _safe(c.express, function (app) {});
@@ -583,3 +590,26 @@ exports.index = function (req, res) {
     }
   });
 };
+exports.destroy = function (req, res) {
+  doSync(function destroySync() {
+    if (!_conf.allowDestroy) {
+      return _e(res, _ERR.DESTROY_NOT_ALLOWED);
+    }
+    var entity, collection;
+    entity = req.param('entity', null);
+    if (!_exists(entity)) {
+      return _e(res, _ERR.ENTITY_NOT_SET);
+    }
+    try {
+      collection = _db.collection.sync(_db, entity);
+      collection.drop.sync(collection);
+
+      return res.send('', 200);
+    } catch (e) {
+      return _e(res, _ERR.DESTROY_FAILED, e);
+    }
+  });
+};
+
+
+
