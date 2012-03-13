@@ -456,7 +456,7 @@ exports.refreshObject = function (req, res) {
 };
 exports.query = function (req, res) {
   doSync(function querySync() {
-    var entity, doFindOne, doCount, query, opts, or, and, sort, skip, limit, mr, mrOpts, sortValues, order, results, cursor, collection, result, key, resultCount;
+    var entity, doFindOne, doCount, query, opts, or, and, incl, sort, skip, limit, mr, mrOpts, sortValues, order, results, cursor, collection, result, key, resultCount, i, j, field, dbRef, resolved;
     entity = req.param('entity', null);
     if (!_exists(entity)) {
       return _e(res, _ERR.ENTITY_NOT_SET);
@@ -467,6 +467,7 @@ exports.query = function (req, res) {
     opts = {};
     or = req.param('or', null);
     and = req.param('and', null);
+    incl = req.param('incl', []);
     sort = req.param('sort', null);
     skip = req.param('skip', null);
     limit = req.param('limit', null);
@@ -531,10 +532,10 @@ exports.query = function (req, res) {
           mr.reduce,
           mrOpts
         );
-      } else if (doFindOne) {
-        result = collection.findOne.sync(collection, query, opts);
-        results = [result];
       } else {
+        if (doFindOne) {
+          opts.limit = 1;
+        }
         cursor = collection.find.sync(collection, query, opts);
 
         if (doCount) {
@@ -552,6 +553,27 @@ exports.query = function (req, res) {
                         resultCount,
                         'results, may impact server performance negatively. try to optimize the query!',
                         _c.reset);
+          }
+
+          for (i in results) {
+            if (results.hasOwnProperty(i)) {
+              for (j in incl) {
+                if (incl.hasOwnProperty(j)) {
+                  result = results[i];
+                  field = incl[j];
+                  dbRef = result[field];
+                  try {
+                    resolved = _db.dereference.sync(_db, dbRef);
+                    if (_def(resolved)) {
+                      result[field] = resolved;
+                    }
+                  } catch (refErr) {
+                    console.error('error: could not resolve reference for key "' + field + '"');
+                    console.error(refErr);
+                  }
+                }
+              }
+            }
           }
         }
       }
