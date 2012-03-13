@@ -119,6 +119,9 @@ var _decodeDkObj = function (o) {
     if (key === 'dk:data') {
       this[key] = new Buffer(value, 'base64');
     }
+    if (key === '$id') {
+      this[key] = new mongo.ObjectID(value);
+    }
   });
 };
 var _encodeDkObj = function (o) {
