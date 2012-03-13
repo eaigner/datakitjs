@@ -37,7 +37,7 @@ var _createRoutes = function (path) {
     return path + '/' + _safe(p, '');
   };
   app.get(m(), exports.info);
-  app.get(m('public/:key'), exports.public);
+  app.get(m('public/:key'), exports.getPublishedObject);
   app.post(m('publish'), _secureMethod(exports.publishObject));
   app.post(m('save'), _secureMethod(exports.saveObject));
   app.post(m('delete'), _secureMethod(exports.deleteObject));
@@ -137,7 +137,7 @@ var _generateNextSequenceNumber = function (entity) {
     {'_id': entity},
     [],
     {'$inc': {'seq': 1}},
-    {new: true}
+    {'new': true}
   );
 
   return doc.seq;
@@ -216,7 +216,7 @@ exports.run = function (c) {
 exports.info = function (req, res) {
   res.send('datakit', 200);
 };
-exports.public = function (req, res) {
+exports.getPublishedObject = function (req, res) {
   doSync(function publicSync() {
     var key, col, result, oid, fields;
     key = req.param('key', null);
